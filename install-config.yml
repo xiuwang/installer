@@ -1,0 +1,32 @@
+admin:
+  email: xiuwang@redhat.com
+  password: redhat
+baseDomain: tt.testing
+clusterID: 812305e7-6e02-4ee9-b270-3862c1220c61
+machines:
+- name: master
+  platform: {}
+  replicas: 1
+- name: worker
+  platform: {}
+  replicas: 1
+metadata:
+  creationTimestamp: null
+  name: test1
+networking:
+  clusterNetworks:
+  - cidr: 10.128.0.0/14
+    hostSubnetLength: 9
+  serviceCIDR: 172.30.0.0/16
+  type: OpenshiftSDN
+platform:
+  libvirt:
+    URI: qemu+tcp://192.168.122.1/system
+    defaultMachinePlatform:
+      image: https://releases-rhcos.svc.ci.openshift.org/storage/releases/maipo/47.171/redhat-coreos-maipo-47.171-qemu.qcow2
+    masterIPs: null
+    network:
+      if: tt0
+      ipRange: 192.168.126.0/24
+pullSecret: '{"auths": {"quay.io": {"auth": "Y29yZW9zK3RlYzJfaWZidWdsandoYTNkaW4yYmlqY2MybjJlaTpLMVNEQjNVWTlHMUZQUFpKTFg5VTFOWlJIQjRURjA1WllEOTZBMjdSWTRYRVcwSVVKVkxWRFZFSDFDSlZNQlNS",
+  "email": ""}}}'

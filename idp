@@ -1,0 +1,69 @@
+#!/bin/bash
+
+echo -e "\033[44;37mPlease execute this script on the master which contains kubeconfig file!\033[0m"
+echo -n  "please enter the kubeconfig absolute path ->"
+read KC
+
+datename=$(date +%Y%m%d-%H%M%S)
+
+step(){
+  echo -e "\033[47;30m$1\033[0m"
+}
+
+checkreturn(){
+  if [ $? -ne 0 ]; then
+    echo -e "`date +%H:%M:%S` \033[31mThe step failed and you need to get the cluster status back manually e.g switch back to previous user!!! \033[0m"
+    exit 1
+  fi
+}
+
+if [ ! -f ${KC} ];then
+  echo -e "`date +%H:%M:%S` \033[31mThe kubeconfig file doesn't exit \033[0m"
+  exit 1
+fi
+
+step "Step 1: check whether oc client exits"
+which "oc" > /dev/null
+if [ $? -eq 0 ]
+then
+    echo -e "`date +%H:%M:%S` \033[32m oc command is exist \033[0m"
+else
+    echo -e "`date +%H:%M:%S` \033[31m oc command not exist,you should install the oc client on master \033[0m"
+    exit 1
+fi
+
+step "Step 2: switch to cluster-admin user"
+CC=`oc config current-context --config="${KC}"`
+oc login -u system:admin --config="${KC}" > /dev/null
+checkreturn
+
+step "Step 3: config 4.0 oauthconfig"
+URL=`oc --config="${KC}" status | grep -o 'https.*'`
+if [ ! ${URL} ]; then
+  echo -e "`date +%H:%M:%S` \033[31m Cann't obtain masterURL \033[0m"
+fi
+
+oc get clusterversions.config.openshift.io/version -o yaml >/tmp/version.${datename} --config="${KC}"
+checkreturn
+PT=`oc get clusterversions.config.openshift.io/version -o go-template --template={{.spec.overrides}}`
+oc patch clusterversions.config.openshift.io/version \
+    -p '{"spec":{"overrides": [{"kind": "Deployment","name": "openshift-cluster-kube-apiserver-operator","unmanaged": true}]}}'\
+    --type merge --config="${KC}"
+checkreturn
+
+oc get kubeapiserveroperatorconfig/instance -o yaml > /tmp/instance.${datename} --config="${KC}"
+checkreturn
+cat>/tmp/allowall.idp<<EOF
+{"spec":{"unsupportedConfigOverrides": {"oauthConfig": {"identityProviders": [{"challenge": true,"login": true,"name": "anypassword","provider": {"apiVersion": "v1","kind": "AllowAllPasswordIdentityProvider"}}],"masterCA": "/etc/kubernetes/static-pod-resources/configmaps/kubelet-serving-ca/ca-bundle.crt","masterPublicURL": "${URL}","masterURL": "${URL}"}}}}
+EOF
+checkreturn
+oc patch kubeapiserveroperatorconfig instance  --patch "$(cat /tmp/allowall.idp)" --type merge --config="${KC}"
+checkreturn
+rm /tmp/allowall.idp
+
+step "Step 4: switch back to previous user"
+oc config use-context ${CC} --config="${KC}"
+checkreturn
+
+echo -e "\033[32mAll Success\033[0m"
+echo -e "\033[33mBecause CustomResources don't support the strategic merge patch, you need to get {${PT}} back to clusterversions.config.openshift.io/version manually.\033[0m"
